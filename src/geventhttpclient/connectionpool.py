@@ -50,7 +50,8 @@ class ConnectionPool(object):
                  size=5, disable_ipv6=False,
                  connection_timeout=DEFAULT_CONNECTION_TIMEOUT,
                  network_timeout=DEFAULT_NETWORK_TIMEOUT,
-                 use_proxy=False):
+                 use_proxy=False,
+                 proxy_auth_token=None):
         self._closed = False
         self._connection_host = connection_host
         self._connection_port = connection_port
@@ -59,6 +60,7 @@ class ConnectionPool(object):
         self._semaphore = lock.BoundedSemaphore(size)
         self._socket_queue = gevent.queue.LifoQueue(size)
         self._use_proxy = use_proxy
+        self._proxy_auth_token = proxy_auth_token
 
         self.connection_timeout = connection_timeout
         self.network_timeout = network_timeout
@@ -139,11 +141,14 @@ class ConnectionPool(object):
 
     def _setup_proxy(self, sock):
         if self._use_proxy:
+            req = "CONNECT {self._request_host}:{self._request_port} HTTP/1.1".format(self=self)
+            if self._proxy_auth_token:
+                req = req + "\r\nProxy-Authorization: {self._proxy_auth_token}".format(self=self)
+            req += "\r\n\r\n"
+
             sock.send(
                 six.binary_type(
-                    "CONNECT {self._request_host}:{self._request_port} "
-                    "HTTP/1.1\r\n\r\n".format(self=self),
-                    'utf8'
+                    req
                 )
             )
 
